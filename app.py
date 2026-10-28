@@ -164,7 +164,7 @@ def engineer(raw, top_breeds):
     return d
 
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=2)
 def prepare(clip):
     raw = load_raw()
     raw = raw.drop_duplicates().reset_index(drop=True)
@@ -200,7 +200,7 @@ def make_model(name, params=None, balanced=False, rs=42):
     elif name == "Random Forest":
         est = RandomForestClassifier(n_estimators=p.get("n_estimators", 200), max_depth=p.get("max_depth", 12),
                                      min_samples_leaf=p.get("min_leaf", 2), class_weight=cw,
-                                     n_jobs=-1, random_state=rs)
+                                     n_jobs=2, random_state=rs)
     elif name == "Gradient Boosting":
         est = HistGradientBoostingClassifier(learning_rate=p.get("lr", 0.1), max_iter=p.get("n_iter", 200),
                                              max_depth=p.get("max_depth", 6), class_weight=cw, random_state=rs)
@@ -543,7 +543,7 @@ def page_theory():
         st.markdown("**ROC-AUC:** พื้นที่ใต้กราฟ ROC (TPR เทียบ FPR ทุก threshold) 0.5 = เดาสุ่ม, 1.0 = สมบูรณ์")
 
 
-@st.cache_data(show_spinner="กำลังฝึกและประเมินโมเดลทั้งหมด ...")
+@st.cache_data(show_spinner="กำลังฝึกและประเมินโมเดลทั้งหมด ...", max_entries=3)
 def evaluate_all(clip, bal, ts, rs):
     _, Xa, ya, _, _ = prepare(clip)
     Xtr, Xte, ytr, yte = train_test_split(Xa, ya, test_size=ts, random_state=rs, stratify=ya)
@@ -556,7 +556,7 @@ def evaluate_all(clip, bal, ts, rs):
         fit_t = time.time() - t0
         p = m.predict(Xte)
         prob = m.predict_proba(Xte)[:, 1]
-        cvs = cross_val_score(make_model(name, balanced=bal, rs=rs), Xtr, ytr, cv=cv, scoring="roc_auc", n_jobs=-1)
+        cvs = cross_val_score(make_model(name, balanced=bal, rs=rs), Xtr, ytr, cv=cv, scoring="roc_auc", n_jobs=1)
         rows.append({
             "โมเดล": name,
             "Train Accuracy": accuracy_score(ytr, m.predict(Xtr)),
@@ -801,7 +801,7 @@ def page_app():
                 fig_show(fig)
 
 
-@st.cache_resource(show_spinner="กำลังฝึกโมเดล ...")
+@st.cache_resource(show_spinner="กำลังฝึกโมเดล ...", max_entries=8)
 def train_one(name, params, clip, bal, ts, rs):
     _, Xa, ya, _, _ = prepare(clip)
     Xtr, _, ytr, _ = train_test_split(Xa, ya, test_size=ts, random_state=rs, stratify=ya)
