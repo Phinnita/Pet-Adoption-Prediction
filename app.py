@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
@@ -44,6 +45,16 @@ DEVELOPER = {
     "student_id": "664245042",
     "section": "หมู่เรียน 66/44",
     "photo": "profile.jpg",
+}
+
+# =====================================================================
+# ลิงก์ผลงาน (วางลิงก์ของตัวเองในเครื่องหมายคำพูด)
+# =====================================================================
+PROJECT_LINKS = {
+    "youtube": "https://youtu.be/YeIjViR0vwg",   # ลิงก์วิดีโอ YouTube
+    "colab": "https://colab.research.google.com/drive/1Tw8yeoepe2v7u75fSAbNOO92xQxaUw3m?usp=sharing",     # ลิงก์ Google Colab (Share > Copy link)
+    "slides": "Pet_Adoption_Presentation.pptx",    # ลิงก์สไลด์ออนไลน์ เช่น Google Slides / Canva (ไม่บังคับ)
+    "github": "https://github.com/Phinnita/Pet-Adoption-Prediction",
 }
 
 BASE_DIR = Path(__file__).parent
@@ -91,6 +102,7 @@ MENU = [
     "3. ทฤษฎีโมเดล ML",
     "4. ประเมินและเปรียบเทียบโมเดล",
     "5. Streamlit Application",
+    "ไฟล์ประกอบ: Colab / YouTube / PowerPoint",
 ]
 
 st.set_page_config(page_title="Pet Adoption Prediction", layout="wide")
@@ -265,15 +277,16 @@ def page_home():
     st.header("หัวข้อในเว็บไซต์")
     st.table(pd.DataFrame({
         "หัวข้อ": ["การกำหนดปัญหาและ Dataset", "Data Preprocessing", "การสร้างโมเดล ML (ทฤษฎี)",
-                   "การประเมินและเปรียบเทียบโมเดล", "Streamlit Application"],
+                   "การประเมินและเปรียบเทียบโมเดล", "Streamlit Application", "ไฟล์ประกอบ"],
         "เนื้อหา": [
             "ปัญหาที่ต้องการแก้ เหตุผลที่เลือกข้อมูล และการสำรวจข้อมูล (EDA)",
             "ตรวจข้อมูล, Feature Engineering, จัดการ Outlier, Encoding, Scaling, แบ่ง Train/Test",
             "แนวคิดและสมการของ Logistic Regression, KNN, Decision Tree, Random Forest, Gradient Boosting",
             "ตารางและกราฟเปรียบเทียบ Accuracy, Precision, Recall, F1, ROC-AUC และ Cross-validation",
             "กรอกข้อมูลสัตว์เลี้ยงเพื่อทำนายโอกาสถูกรับเลี้ยง และทดลองปรับโมเดล",
+            "วิดีโอ YouTube, โค้ด Google Colab, สไลด์ PowerPoint และ GitHub",
         ],
-    }, index=[1, 2, 3, 4, 5]))
+    }, index=[1, 2, 3, 4, 5, "+"]))
     c = st.columns(4)
     c[0].metric("จำนวนสัตว์เลี้ยง", f"{len(raw):,}")
     c[1].metric("สุนัข", f"{(raw['Type'] == 'Dog').sum():,}")
@@ -282,7 +295,7 @@ def page_home():
 
 
 def rate_chart(ax, series, title, order=None):
-    rate = y.groupby(series).mean()
+    rate = y.groupby(series, observed=True).mean()
     if order is not None:
         rate = rate.reindex([o for o in order if o in rate.index])
     ax.bar([str(i) for i in rate.index], rate.values, color="#e07a5f")
@@ -808,7 +821,102 @@ def train_one(name, params, clip, bal, ts, rs):
     return make_model(name, dict(params), balanced=bal, rs=rs).fit(Xtr, ytr)
 
 
-PAGES = dict(zip(MENU, [page_home, page_problem, page_preprocess, page_theory, page_compare, page_app]))
+
+def youtube_url(url):
+    """แปลงลิงก์ YouTube ทุกรูปแบบให้เหลือ watch?v=ID (ตัด fbclid ฯลฯ)"""
+    import re
+    m = re.search(r"(?:v=|youtu\.be/|shorts/|embed/)([A-Za-z0-9_-]{11})", url or "")
+    return f"https://www.youtube.com/watch?v={m.group(1)}" if m else None
+
+
+def list_files(*exts):
+    found = []
+    for f in sorted(BASE_DIR.rglob("*")):
+        if f.suffix.lower() in exts and ".venv" not in f.parts and "_video_work" not in f.parts:
+            found.append(f)
+    return found
+
+
+def notebook_preview(path, max_cells=40):
+    import json
+    try:
+        nb = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as e:
+        st.warning(f"อ่านไฟล์ notebook ไม่ได้: {e}")
+        return
+    cells = nb.get("cells", [])
+    st.caption(f"ทั้งหมด {len(cells)} cells (แสดง {min(len(cells), max_cells)} cells แรก)")
+    for cell in cells[:max_cells]:
+        src = "".join(cell.get("source", []))
+        if not src.strip():
+            continue
+        if cell.get("cell_type") == "markdown":
+            st.markdown(src)
+        elif cell.get("cell_type") == "code":
+            st.code(src, language="python")
+            for out in cell.get("outputs", [])[:2]:
+                text = "".join(out.get("text", [])) or "".join(out.get("data", {}).get("text/plain", []))
+                if text.strip():
+                    st.text(text[:1500])
+
+
+def page_files():
+    st.title("ไฟล์ประกอบโปรเจกต์")
+    st.write("รวมผลงานทั้งหมดของโปรเจกต์: วิดีโอนำเสนอ, โค้ดบน Google Colab, สไลด์ PowerPoint และ GitHub")
+
+    # ---------- YouTube
+    st.header("วิดีโอนำเสนอ (YouTube)")
+    yt = youtube_url(PROJECT_LINKS.get("youtube"))
+    if yt:
+        st.video(yt)
+        st.markdown(f"[เปิดใน YouTube]({yt})")
+    else:
+        local = list_files(".mp4")
+        if local:
+            st.info("ยังไม่ได้ใส่ลิงก์ YouTube จึงแสดงวิดีโอจากไฟล์ในโปรเจกต์แทน")
+            st.video(str(local[0]))
+        else:
+            st.info("ยังไม่ได้ใส่ลิงก์ YouTube (แก้ที่ PROJECT_LINKS[\"youtube\"] ด้านบนของ app.py)")
+
+    # ---------- Colab
+    st.header("โค้ดบน Google Colab")
+    if PROJECT_LINKS.get("colab"):
+        st.link_button("เปิดใน Google Colab", PROJECT_LINKS["colab"], type="primary")
+    nbs = list_files(".ipynb")
+    for nb in nbs:
+        st.download_button(f"ดาวน์โหลด {nb.name}", nb.read_bytes(), file_name=nb.name,
+                           mime="application/x-ipynb+json", key=f"dl_{nb.name}")
+        with st.expander(f"ดูเนื้อหา {nb.name}"):
+            notebook_preview(nb)
+    if not PROJECT_LINKS.get("colab") and not nbs:
+        st.info("ยังไม่มีไฟล์ Colab: ใส่ลิงก์ที่ PROJECT_LINKS[\"colab\"] หรืออัปโหลดไฟล์ .ipynb ไว้ในโฟลเดอร์โปรเจกต์")
+
+    # ---------- PowerPoint
+    st.header("สไลด์นำเสนอ (PowerPoint)")
+    slides = PROJECT_LINKS.get("slides", "")
+    if slides:
+        embed = slides
+        if "docs.google.com/presentation" in slides:
+            embed = slides.split("/edit")[0].split("/pub")[0] + "/embed?start=false&loop=false"
+        if "docs.google.com/presentation" in slides or "canva.com" in slides:
+            components.iframe(embed, height=520)
+        st.link_button("เปิดสไลด์", slides)
+    decks = list_files(".pptx", ".pdf")
+    for f in decks:
+        mime = "application/pdf" if f.suffix.lower() == ".pdf" else \
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        st.download_button(f"ดาวน์โหลด {f.name}", f.read_bytes(), file_name=f.name, mime=mime, key=f"dl_{f.name}")
+    if not slides and not decks:
+        st.info("ยังไม่มีสไลด์: อัปโหลดไฟล์ .pptx ไว้ในโฟลเดอร์โปรเจกต์ หรือใส่ลิงก์ที่ PROJECT_LINKS[\"slides\"]")
+
+    # ---------- GitHub
+    st.header("Source code (GitHub)")
+    st.link_button("เปิด GitHub Repository", PROJECT_LINKS["github"])
+    st.caption(PROJECT_LINKS["github"])
+
+
+PAGES = dict(zip(MENU, [page_home, page_problem, page_preprocess, page_theory, page_compare, page_app,
+                        page_files]))
 PAGES[page]()
 
 st.divider()
